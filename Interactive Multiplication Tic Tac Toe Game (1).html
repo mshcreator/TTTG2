@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة إكس أوه جدول الضرب التفاعلية - أ. فاطمة شنيمر</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Arabic Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=Amiri:wght@700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti for Celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: linear-gradient(135deg, #fb923c 0%, #f43f5e 50%, #8b5cf6 100%);
+            touch-action: manipulation;
+            user-select: none;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background bubbles */
+        .bg-bubbles {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .bubble {
+            position: absolute;
+            bottom: -100px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            animation: rise 12s infinite linear;
+        }
+        @keyframes rise {
+            0% { transform: translateY(0) scale(0.8); opacity: 0; }
+            50% { opacity: 0.6; }
+            100% { transform: translateY(-120vh) scale(1.2); opacity: 0; }
+        }
+
+        /* Tic-Tac-Toe Grid Cell Styling */
+        .grid-cell {
+            background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+            border: 4px solid #fdba74;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .grid-cell:hover:not(.claimed) {
+            transform: translateY(-4px);
+            border-color: #f97316;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .grid-cell:active:not(.claimed) {
+            transform: scale(0.96);
+        }
+
+        /* Claimed Symbols */
+        .symbol-x {
+            color: #ef4444;
+            text-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .symbol-o {
+            color: #22c55e;
+            text-shadow: 0 4px 8px rgba(34, 197, 94, 0.3);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .winning-cell {
+            animation: winPulse 1s infinite alternate;
+            border-color: #facc15 !important;
+            background: #fef9c3 !important;
+        }
+
+        @keyframes winPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0px rgba(250, 204, 21, 0.7); }
+            100% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #f97316;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4 text-slate-800 relative">
+
+    <!-- Background Animated Bubbles -->
+    <div class="bg-bubbles" id="bubbles-container"></div>
+
+    <!-- Header / Controls Bar -->
+    <header class="max-w-5xl mx-auto w-full bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-3 sm:p-4 mb-3 border-4 border-orange-300 z-10 relative">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+            
+            <!-- Title with Mascot -->
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-2xl shadow-md transform -rotate-3 border-2 border-orange-600">
+                    ❌⭕
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-2xl font-black text-slate-800 flex items-center gap-2">
+                        لعبة إكس أوه جدول الضرب
+                        <span class="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full border border-orange-300">مجهزة للجوال 📱</span>
+                    </h1>
+                    <p class="text-xs sm:text-sm text-purple-800 font-black flex items-center gap-1">
+                        <span>👩‍🏫 إعداد المعلمة:</span>
+                        <span class="text-purple-900 underline decoration-orange-400 decoration-2">فاطمة شنيمر</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Game Control Settings -->
+            <div class="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto">
+                
+                <!-- Table Selector -->
+                <div class="flex items-center gap-1.5 bg-orange-50 p-1.5 rounded-xl border-2 border-orange-200">
+                    <label for="table-select" class="text-xs sm:text-sm font-black text-orange-800 mr-1">الجدول:</label>
+                    <select id="table-select" class="bg-white border-2 border-orange-300 rounded-lg px-2.5 py-1 text-xs sm:text-sm font-black text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="2">جدول (٢)</option>
+                        <option value="3">جدول (٣)</option>
+                        <option value="4">جدول (٤)</option>
+                        <option value="5">جدول (٥)</option>
+                        <option value="6">جدول (٦)</option>
+                        <option value="7">جدول (٧)</option>
+                        <option value="8">جدول (٨)</option>
+                        <option value="9">جدول (٩)</option>
+                        <option value="10">جدول (١٠)</option>
+                        <option value="11">جدول (١١)</option>
+                        <option value="12">جدول (١٢)</option>
+                        <option value="random">تحدي ممتع 🎲</option>
+                    </select>
+                </div>
+
+                <!-- Game Mode Switcher -->
+                <div class="flex items-center gap-1 bg-purple-50 p-1 rounded-xl border-2 border-purple-200">
+                    <button id="mode-single-btn" class="px-2.5 py-1 rounded-lg text-xs font-black transition bg-purple-600 text-white shadow-sm">
+                        ضد الجهاز 🤖
+                    </button>
+                    <button id="mode-duo-btn" class="px-2.5 py-1 rounded-lg text-xs font-black transition text-purple-700 hover:bg-purple-100">
+                        لاعبين 👥
+                    </button>
+                </div>
+
+                <!-- Number System Switcher -->
+                <button id="num-toggle-btn" class="bg-blue-50 hover:bg-blue-100 text-blue-800 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black border-2 border-blue-200 flex items-center gap-1.5 transition active:scale-95">
+                    <i class="fa-solid fa-arrow-rotate-left text-blue-600"></i>
+                    <span>الأرقام: <strong id="num-type-label" class="text-blue-700">شرقية (١٢٣)</strong></span>
+                </button>
+
+                <!-- Student Name Button -->
+                <button id="student-name-btn" class="bg-purple-50 hover:bg-purple-100 text-purple-800 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black border-2 border-purple-200 flex items-center gap-1.5 transition active:scale-95">
+                    <i class="fa-solid fa-user-graduate text-purple-600"></i>
+                    <span id="student-name-display">اسم البطل: ✏️</span>
+                </button>
+
+                <!-- Restart Game Button -->
+                <button id="restart-btn" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black shadow-lg transition flex items-center gap-1.5 border-b-4 border-emerald-700">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span>لعبة جديدة</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="max-w-4xl mx-auto w-full flex-1 flex flex-col gap-3 items-center justify-center z-10 relative">
+        
+        <div class="w-full bg-white/95 backdrop-blur-md p-3 sm:p-6 rounded-3xl border-4 border-orange-300 shadow-2xl transition-all">
+            
+            <!-- Player Status & Turn Indicator -->
+            <div class="flex justify-between items-center mb-4 bg-orange-100/90 p-3 px-4 rounded-2xl border-2 border-orange-300 shadow-sm">
+                
+                <!-- Player X Status -->
+                <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-red-200 shadow-sm" id="player-x-card">
+                    <span class="text-red-500 text-xl font-black">❌</span>
+                    <div class="text-xs sm:text-sm font-black text-slate-700">
+                        <span id="player-x-name">اللاعب (X)</span>: 
+                        <span id="score-x" class="text-red-600 font-bold">٠</span>
+                    </div>
+                </div>
+
+                <!-- Status Banner Center -->
+                <div class="text-xs sm:text-base font-black text-slate-800 text-center px-2" id="turn-banner">
+                    دور اللاعب <span class="text-red-500 font-black text-lg">❌</span> - اختر مربعاً وأجب على السؤال!
+                </div>
+
+                <!-- Player O Status -->
+                <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-green-200 shadow-sm opacity-60" id="player-o-card">
+                    <span class="text-green-500 text-xl font-black">⭕</span>
+                    <div class="text-xs sm:text-sm font-black text-slate-700">
+                        <span id="player-o-name">الذكاء الاصطناعي (O)</span>: 
+                        <span id="score-o" class="text-green-600 font-bold">٠</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 3x3 Grid Board -->
+            <div id="grid-board" class="grid grid-cols-3 gap-2.5 sm:gap-4 max-w-md sm:max-w-lg mx-auto aspect-square p-2 bg-orange-50/80 rounded-2xl border-3 border-orange-200">
+                <!-- 9 Cells injected via JS -->
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Math Question Modal -->
+    <div id="question-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity duration-300 opacity-0">
+        <div class="bg-white rounded-3xl border-4 border-orange-400 p-5 sm:p-7 max-w-md w-full text-center relative shadow-2xl transform scale-95 transition-transform duration-300">
+            
+            <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 border-2 border-orange-300">
+                ❓
+            </div>
+            
+            <h3 class="text-base sm:text-lg font-black text-slate-700 mb-1">احسب الناتج لامتلاك المربع!</h3>
+            
+            <!-- Multiplication Math Equation Display -->
+            <div class="bg-orange-50 border-2 border-orange-200 rounded-2xl py-4 my-3 text-3xl sm:text-4xl font-black text-slate-800 font-serif tracking-widest shadow-inner" id="modal-equation">
+                ٥ × ٦ = ؟
+            </div>
+
+            <p class="text-xs text-slate-500 font-bold mb-4">اختر النتيجة الصحيحة من الخيارات التالية:</p>
+
+            <!-- 4 Multiple Choice Options -->
+            <div class="grid grid-cols-2 gap-3" id="options-container">
+                <!-- Option Buttons Injected via JS -->
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Student Name Modal -->
+    <div id="name-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity duration-300 opacity-0">
+        <div class="bg-white rounded-3xl border-4 border-orange-400 p-6 max-w-md w-full text-center relative shadow-2xl transform scale-95 transition-transform duration-300">
+            <div class="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 border-2 border-orange-300">
+                ✏️
+            </div>
+            <h3 class="text-xl font-black text-slate-800 mb-2">أهلاً بك يا بطل! 👋</h3>
+            <p class="text-sm font-bold text-slate-600 mb-4">اكتب اسمك الجميل ليتم عرضه في اللعبة والشهادة:</p>
+            
+            <input type="text" id="name-input-field" placeholder="اكتب اسمك هنا..." class="w-full bg-slate-50 border-2 border-orange-300 focus:border-orange-500 rounded-xl p-3 text-center text-lg font-black text-orange-900 focus:outline-none mb-4 shadow-inner">
+            
+            <div class="flex gap-2 justify-center">
+                <button id="save-name-btn" class="bg-orange-600 hover:bg-orange-700 text-white font-black px-6 py-2.5 rounded-xl text-sm shadow-md transition active:scale-95 flex-1">
+                    حفظ ومتابعة 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificate Modal -->
+    <div id="cert-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden transition-opacity duration-300 opacity-0">
+        <div class="bg-gradient-to-br from-amber-50 via-white to-amber-100 rounded-3xl border-8 border-amber-400 p-4 sm:p-8 max-w-xl w-full text-center relative shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300" id="cert-card-content">
+            
+            <!-- Certificate Decorative Corners -->
+            <div class="absolute top-2 right-2 text-2xl text-amber-500">🌟</div>
+            <div class="absolute top-2 left-2 text-2xl text-amber-500">🌟</div>
+            <div class="absolute bottom-2 right-2 text-2xl text-amber-500">🏆</div>
+            <div class="absolute bottom-2 left-2 text-2xl text-amber-500">🏆</div>
+
+            <!-- Header Badge -->
+            <div id="cert-badge" class="inline-block bg-amber-400 text-amber-950 font-black px-6 py-1.5 rounded-full text-sm sm:text-base mb-3 shadow-md border-2 border-amber-500">
+                🏅 شهادة تفوق وتقدير 🏅
+            </div>
+
+            <h2 id="cert-title" class="text-2xl sm:text-4xl font-black text-amber-900 font-serif mb-1">وسام بطل إكس أوه الضرب</h2>
+            <p class="text-xs sm:text-sm text-amber-700 font-bold mb-4">يشهد نادي الأبطال للتفوق بأن البطل / البطلة:</p>
+
+            <!-- Student Name Container -->
+            <div class="bg-white border-b-4 border-amber-400 py-2.5 px-4 rounded-2xl shadow-inner mb-4 max-w-md mx-auto">
+                <span id="cert-student-name" class="text-2xl sm:text-3xl font-black text-purple-700 font-serif tracking-wide block">البطل المبدع</span>
+            </div>
+
+            <p id="cert-desc" class="text-xs sm:text-base text-slate-700 font-bold mb-5 leading-relaxed">
+                قد أتم بنجاح وتفوق الفوز في لعبة <span id="cert-table-name" class="text-orange-700 font-black">إكس أوه جدول الضرب</span> بإجابات رائعة وسرعة بديهة! 👏🎉
+            </p>
+
+            <!-- Medal Graphic / Mascot -->
+            <div class="flex justify-center items-center gap-4 mb-6">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-orange-500 rounded-full flex items-center justify-center text-3xl sm:text-4xl shadow-lg border-4 border-white text-white transform -rotate-6">
+                    ❌
+                </div>
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-green-500 rounded-full flex items-center justify-center text-3xl sm:text-4xl shadow-lg border-4 border-white text-white transform rotate-6">
+                    ⭕
+                </div>
+            </div>
+
+            <!-- Date and Signature -->
+            <div class="flex justify-between items-center text-xs sm:text-sm font-bold text-amber-900 border-t-2 border-dashed border-amber-300 pt-3 mb-6 px-4">
+                <div>التاريخ: <span id="cert-date">٢٠٢٦/١٠/٢٥</span></div>
+                <div>توقيع المعلمة: <span class="font-black text-purple-800">أ. فاطمة شنيمر ✍️</span></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap justify-center gap-2 print:hidden">
+                <button id="print-cert-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-xl text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i>
+                    <span>طباعة الشهادة 🖨️</span>
+                </button>
+                <button id="close-cert-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-4 py-2 rounded-xl text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center gap-1.5">
+                    <i class="fa-solid fa-play"></i>
+                    <span>لعبة جديدة 🎲</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="max-w-5xl mx-auto w-full text-center py-2 text-xs font-bold text-white/90 drop-shadow mt-2 z-10 relative">
+        🎯 وسيلة إكس أوه الضرب التفاعلية &copy; 2026
+    </footer>
+
+    <!-- Audio Effects (Synthesized Web Audio API) -->
+    <script>
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+
+            initCtx() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playSelect() {
+                this.initCtx();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(450, now);
+                osc.frequency.exponentialRampToValueAtTime(650, now + 0.08);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+
+            playCorrect() {
+                this.initCtx();
+                const now = this.ctx.currentTime;
+                
+                const osc1 = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc1.type = 'sine';
+                osc2.type = 'triangle';
+
+                osc1.frequency.setValueAtTime(523.25, now); // C5
+                osc1.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+
+                osc2.frequency.setValueAtTime(329.63, now); // E4
+                osc2.frequency.exponentialRampToValueAtTime(659.25, now + 0.15); // E5
+
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 0.35);
+                osc2.stop(now + 0.35);
+            }
+
+            playWrong() {
+                this.initCtx();
+                const now = this.ctx.currentTime;
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(120, now + 0.2);
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playWin() {
+                this.initCtx();
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, index) => {
+                    setTimeout(() => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start();
+                        osc.stop(this.ctx.currentTime + 0.4);
+                    }, index * 120);
+                });
+            }
+        }
+
+        const sfx = new SoundFX();
+    </script>
+
+    <!-- Main Game Logic -->
+    <script>
+        // State Variables
+        let currentTable = "2";
+        let useEasternArabic = true; 
+        let studentName = "";
+        let isSinglePlayer = true; // true: vs AI, false: 2 players
+        let currentPlayer = "X"; // "X" or "O"
+        let boardState = Array(9).fill(null);
+        let boardProblems = [];
+        let pendingCellIndex = null;
+        let scoreX = 0;
+        let scoreO = 0;
+
+        const easternDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        
+        const winningCombinations = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+            [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        function formatNumber(num) {
+            if (!useEasternArabic) return num.toString();
+            return num.toString().split('').map(d => easternDigits[parseInt(d)] || d).join('');
+        }
+
+        // Custom Modal for Student Name
+        function openNameModal(onSuccessCallback = null) {
+            const modal = document.getElementById('name-modal');
+            const card = modal.querySelector('div');
+            const input = document.getElementById('name-input-field');
+            
+            input.value = studentName;
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                card.classList.remove('scale-95');
+                input.focus();
+            }, 10);
+
+            const saveBtn = document.getElementById('save-name-btn');
+            const handleSave = () => {
+                const val = input.value.trim();
+                if (val) {
+                    studentName = val;
+                    document.getElementById('student-name-display').innerText = `البطل: ${studentName}`;
+                    updatePlayerNamesUI();
+                }
+                closeNameModal();
+                if (onSuccessCallback) onSuccessCallback();
+                saveBtn.removeEventListener('click', handleSave);
+            };
+
+            saveBtn.onclick = handleSave;
+        }
+
+        function closeNameModal() {
+            const modal = document.getElementById('name-modal');
+            const card = modal.querySelector('div');
+            modal.classList.add('opacity-0');
+            card.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function updatePlayerNamesUI() {
+            const nameX = studentName ? studentName : "اللاعب (X)";
+            document.getElementById('player-x-name').innerText = nameX;
+
+            if (isSinglePlayer) {
+                document.getElementById('player-o-name').innerText = "الذكاء الاصطناعي (O)";
+            } else {
+                document.getElementById('player-o-name').innerText = "اللاعب (O)";
+            }
+        }
+
+        // Show Certificate Modal (Supports Win & Draw)
+        function showCertificate(resultType, winnerSymbol = null) {
+            const certModal = document.getElementById('cert-modal');
+            const certCard = document.getElementById('cert-card-content');
+            
+            let displayName = studentName || "البطل المبدع";
+            if (resultType === "win" && !isSinglePlayer && winnerSymbol === "O") {
+                displayName = "اللاعب الثاني (المتميز)";
+            }
+
+            document.getElementById('cert-student-name').innerText = displayName;
+            
+            const tableText = currentTable === "random" ? "تحدي الجداول المختلطة" : `جدول (${formatNumber(currentTable)})`;
+
+            const badgeElem = document.getElementById('cert-badge');
+            const titleElem = document.getElementById('cert-title');
+            const descElem = document.getElementById('cert-desc');
+
+            if (resultType === "win") {
+                badgeElem.innerText = "🏅 شهادة تفوق وتقدير 🏅";
+                titleElem.innerText = "وسام بطل إكس أوه الضرب";
+                descElem.innerHTML = `قد أتم بنجاح وتفوق الفوز في لعبة <span class="text-orange-700 font-black">${tableText}</span> بإجابات رائعة وسرعة بديهة! 👏🎉`;
+            } else {
+                // Draw Certificate
+                badgeElem.innerText = "🌟 شهادة تميز ومشاركة 🌟";
+                titleElem.innerText = "وسام التحدي والذكاء";
+                descElem.innerHTML = `قد أظهر أداءً رائعاً وذكاءً متميزاً بالتعادل في لعبة <span class="text-orange-700 font-black">${tableText}</span> مع منافسة قوية! 🤝✨`;
+            }
+
+            // Format currentDate
+            const now = new Date();
+            const year = formatNumber(now.getFullYear());
+            const month = formatNumber(now.getMonth() + 1);
+            const day = formatNumber(now.getDate());
+            document.getElementById('cert-date').innerText = `${year}/${month}/${day}`;
+
+            certModal.classList.remove('hidden');
+            setTimeout(() => {
+                certModal.classList.remove('opacity-0');
+                certCard.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function hideCertificate() {
+            const certModal = document.getElementById('cert-modal');
+            const certCard = document.getElementById('cert-card-content');
+            certModal.classList.add('opacity-0');
+            certCard.classList.add('scale-95');
+            setTimeout(() => {
+                certModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // Generate background floating bubbles
+        function createBubbles() {
+            const container = document.getElementById('bubbles-container');
+            container.innerHTML = '';
+            for (let i = 0; i < 12; i++) {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                const size = Math.random() * 60 + 20;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                bubble.style.animationDelay = `${Math.random() * 8}s`;
+                bubble.style.animationDuration = `${Math.random() * 6 + 8}s`;
+                container.appendChild(bubble);
+            }
+        }
+
+        // Generate Problems for the 9 cells
+        function generateBoardProblems() {
+            boardProblems = [];
+            const isRandom = currentTable === "random";
+            let factors = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+            factors.sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < 9; i++) {
+                let num1 = factors[i];
+                let num2 = isRandom ? Math.floor(Math.random() * 10) + 1 : parseInt(currentTable);
+                boardProblems.push({
+                    num1: num1,
+                    num2: num2,
+                    answer: num1 * num2
+                });
+            }
+        }
+
+        // Render the 3x3 Grid
+        function renderBoard() {
+            const grid = document.getElementById('grid-board');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = "grid-cell rounded-2xl flex flex-col items-center justify-center p-2 select-none font-serif";
+                cell.setAttribute('data-index', i);
+
+                const prob = boardProblems[i];
+                const sym = boardState[i];
+
+                if (sym) {
+                    cell.classList.add('claimed');
+                    const colorClass = sym === 'X' ? 'symbol-x' : 'symbol-o';
+                    const icon = sym === 'X' ? '❌' : '⭕';
+                    cell.innerHTML = `
+                        <span class="text-4xl sm:text-6xl font-black ${colorClass}">${icon}</span>
+                        <span class="text-[10px] sm:text-xs text-slate-400 font-sans font-bold mt-1">${formatNumber(prob.num1)} × ${formatNumber(prob.num2)}</span>
+                    `;
+                } else {
+                    cell.innerHTML = `
+                        <span class="text-lg sm:text-2xl font-black text-orange-950">${formatNumber(prob.num1)} × ${formatNumber(prob.num2)}</span>
+                        <span class="text-[10px] sm:text-xs text-orange-500 font-sans font-bold mt-1">اضغط للحل 🎯</span>
+                    `;
+                    cell.addEventListener('click', () => handleCellClick(i));
+                }
+
+                grid.appendChild(cell);
+            }
+
+            updateTurnUI();
+        }
+
+        function handleCellClick(index) {
+            if (boardState[index] !== null) return;
+
+            // If AI Turn, prevent human click
+            if (isSinglePlayer && currentPlayer === "O") return;
+
+            sfx.playSelect();
+            pendingCellIndex = index;
+            openQuestionModal(index);
+        }
+
+        // Open Question Modal
+        function openQuestionModal(index) {
+            const prob = boardProblems[index];
+            const modal = document.getElementById('question-modal');
+            const card = modal.querySelector('div');
+            
+            document.getElementById('modal-equation').innerText = `${formatNumber(prob.num1)} × ${formatNumber(prob.num2)} = ؟`;
+
+            // Options generation (1 correct, 3 wrong)
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            let choices = [prob.answer];
+            while (choices.length < 4) {
+                let offset = (Math.floor(Math.random() * 5) + 1) * (Math.random() > 0.5 ? 1 : -1);
+                let wrongAns = prob.answer + offset;
+                if (wrongAns > 0 && !choices.includes(wrongAns)) {
+                    choices.push(wrongAns);
+                }
+            }
+            choices.sort(() => Math.random() - 0.5);
+
+            choices.forEach(val => {
+                const btn = document.createElement('button');
+                btn.className = "bg-orange-100 hover:bg-orange-500 hover:text-white text-orange-900 border-2 border-orange-300 rounded-xl py-3 text-xl sm:text-2xl font-black transition active:scale-95 shadow-sm font-serif";
+                btn.innerText = formatNumber(val);
+                btn.onclick = () => processAnswer(val, prob.answer);
+                optionsContainer.appendChild(btn);
+            });
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                card.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeQuestionModal() {
+            const modal = document.getElementById('question-modal');
+            const card = modal.querySelector('div');
+            modal.classList.add('opacity-0');
+            card.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 250);
+        }
+
+        function processAnswer(selectedVal, correctVal) {
+            closeQuestionModal();
+
+            if (selectedVal === correctVal) {
+                sfx.playCorrect();
+                claimCell(pendingCellIndex, currentPlayer);
+            } else {
+                sfx.playWrong();
+                // Wrong answer! Turn switches without claiming cell
+                document.getElementById('turn-banner').innerHTML = `
+                    <span class="text-rose-600 font-black">❌ إجابة خاطئة! انتقل الدور للاعب الآخر.</span>
+                `;
+                setTimeout(() => {
+                    switchTurn();
+                }, 1200);
+            }
+        }
+
+        function claimCell(index, symbol) {
+            boardState[index] = symbol;
+            renderBoard();
+
+            const winCombo = checkWin(symbol);
+            if (winCombo) {
+                handleWin(symbol, winCombo);
+            } else if (boardState.every(c => c !== null)) {
+                handleDraw();
+            } else {
+                switchTurn();
+            }
+        }
+
+        function switchTurn() {
+            currentPlayer = currentPlayer === "X" ? "O" : "X";
+            updateTurnUI();
+
+            // If Single Player Mode & AI Turn
+            if (isSinglePlayer && currentPlayer === "O") {
+                setTimeout(makeAIMove, 700);
+            }
+        }
+
+        function updateTurnUI() {
+            const turnBanner = document.getElementById('turn-banner');
+            const cardX = document.getElementById('player-x-card');
+            const cardO = document.getElementById('player-o-card');
+
+            if (currentPlayer === "X") {
+                const nameX = studentName || "اللاعب X";
+                turnBanner.innerHTML = `دور <span class="text-red-500 font-black text-lg">❌ (${nameX})</span> - اختر مربعاً!`;
+                cardX.classList.remove('opacity-60');
+                cardO.classList.add('opacity-60');
+            } else {
+                const nameO = isSinglePlayer ? "الذكاء الاصطناعي" : "اللاعب O";
+                turnBanner.innerHTML = `دور <span class="text-green-500 font-black text-lg">⭕ (${nameO})</span> - جارٍ الانتظار...`;
+                cardO.classList.remove('opacity-60');
+                cardX.classList.add('opacity-60');
+            }
+        }
+
+        // AI Logic for vs Computer
+        function makeAIMove() {
+            // Find empty cells
+            let emptyIndices = [];
+            boardState.forEach((val, i) => {
+                if (val === null) emptyIndices.push(i);
+            });
+
+            if (emptyIndices.length === 0) return;
+
+            // Simple AI: 1. Try to win, 2. Block X, 3. Random choice
+            let targetIndex = findSmartMove("O") ?? findSmartMove("X") ?? emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+
+            sfx.playSelect();
+            // AI answers correctly automatically with smooth transition
+            setTimeout(() => {
+                sfx.playCorrect();
+                claimCell(targetIndex, "O");
+            }, 500);
+        }
+
+        function findSmartMove(symbol) {
+            for (let combo of winningCombinations) {
+                const [a, b, c] = combo;
+                const vals = [boardState[a], boardState[b], boardState[c]];
+                if (vals.filter(v => v === symbol).length === 2 && vals.filter(v => v === null).length === 1) {
+                    return combo[vals.indexOf(null)];
+                }
+            }
+            return null;
+        }
+
+        function checkWin(symbol) {
+            for (let combo of winningCombinations) {
+                const [a, b, c] = combo;
+                if (boardState[a] === symbol && boardState[b] === symbol && boardState[c] === symbol) {
+                    return combo;
+                }
+            }
+            return null;
+        }
+
+        function handleWin(symbol, combo) {
+            sfx.playWin();
+            
+            // Highlight Winning Line
+            const cells = document.querySelectorAll('.grid-cell');
+            combo.forEach(idx => cells[idx].classList.add('winning-cell'));
+
+            if (symbol === "X") scoreX++;
+            else scoreO++;
+
+            document.getElementById('score-x').innerText = formatNumber(scoreX);
+            document.getElementById('score-o').innerText = formatNumber(scoreO);
+
+            const winnerText = symbol === "X" ? (studentName || "اللاعب X") : (isSinglePlayer ? "الذكاء الاصطناعي" : "اللاعب O");
+            
+            confetti({
+                particleCount: 160,
+                spread: 100,
+                origin: { y: 0.6 }
+            });
+
+            document.getElementById('turn-banner').innerHTML = `
+                <span class="text-emerald-700 font-black text-lg">🎉 مبروك! فاز ${winnerText} بالمباراة!</span>
+            `;
+
+            setTimeout(() => {
+                if (!studentName) {
+                    openNameModal(() => showCertificate("win", symbol));
+                } else {
+                    showCertificate("win", symbol);
+                }
+            }, 1000);
+        }
+
+        function handleDraw() {
+            sfx.playWin();
+            
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+
+            document.getElementById('turn-banner').innerHTML = `
+                <span class="text-amber-700 font-black text-lg">🤝 تعادل رائع بين الطرفين!</span>
+            `;
+
+            setTimeout(() => {
+                if (!studentName) {
+                    openNameModal(() => showCertificate("draw"));
+                } else {
+                    showCertificate("draw");
+                }
+            }, 1000);
+        }
+
+        function resetGame() {
+            currentPlayer = "X";
+            boardState = Array(9).fill(null);
+            generateBoardProblems();
+            renderBoard();
+        }
+
+        // Initialize Events
+        document.addEventListener('DOMContentLoaded', () => {
+            createBubbles();
+
+            const tableSelect = document.getElementById('table-select');
+            const restartBtn = document.getElementById('restart-btn');
+            const numToggleBtn = document.getElementById('num-toggle-btn');
+            const numTypeLabel = document.getElementById('num-type-label');
+            const studentNameBtn = document.getElementById('student-name-btn');
+            const printCertBtn = document.getElementById('print-cert-btn');
+            const closeCertBtn = document.getElementById('close-cert-btn');
+
+            const modeSingleBtn = document.getElementById('mode-single-btn');
+            const modeDuoBtn = document.getElementById('mode-duo-btn');
+
+            tableSelect.addEventListener('change', (e) => {
+                currentTable = e.target.value;
+                resetGame();
+            });
+
+            restartBtn.addEventListener('click', resetGame);
+
+            studentNameBtn.addEventListener('click', () => {
+                openNameModal();
+            });
+
+            numToggleBtn.addEventListener('click', () => {
+                useEasternArabic = !useEasternArabic;
+                numTypeLabel.innerText = useEasternArabic ? "شرقية (١٢٣)" : "إنجليزية (123)";
+                resetGame();
+            });
+
+            modeSingleBtn.addEventListener('click', () => {
+                isSinglePlayer = true;
+                modeSingleBtn.className = "px-2.5 py-1 rounded-lg text-xs font-black transition bg-purple-600 text-white shadow-sm";
+                modeDuoBtn.className = "px-2.5 py-1 rounded-lg text-xs font-black transition text-purple-700 hover:bg-purple-100";
+                updatePlayerNamesUI();
+                resetGame();
+            });
+
+            modeDuoBtn.addEventListener('click', () => {
+                isSinglePlayer = false;
+                modeDuoBtn.className = "px-2.5 py-1 rounded-lg text-xs font-black transition bg-purple-600 text-white shadow-sm";
+                modeSingleBtn.className = "px-2.5 py-1 rounded-lg text-xs font-black transition text-purple-700 hover:bg-purple-100";
+                updatePlayerNamesUI();
+                resetGame();
+            });
+
+            printCertBtn.addEventListener('click', () => {
+                window.print();
+            });
+
+            closeCertBtn.addEventListener('click', () => {
+                hideCertificate();
+                resetGame();
+            });
+
+            resetGame();
+        });
+    </script>
+</body>
+</html>
